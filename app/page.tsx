@@ -1,95 +1,136 @@
-import Image from 'next/image'
-import styles from './page.module.css'
+"use client";
+
+import { useEffect, useState } from "react";
+import _ from "lodash";
+
+interface Todo {
+  id: number;
+  title: string;
+  completed: boolean;
+}
+
+const URL = "https://jsonplaceholder.typicode.com";
 
 export default function Home() {
+  const [todos, setTodos] = useState<Todo[]>();
+
+  useEffect(() => {
+    async function fetchData() {
+      const todos = await fetchTodos();
+      setTodos(todos);
+    }
+    fetchData();
+  }, []);
+
+  async function fetchTodos(): Promise<Todo[]> {
+    const response = await fetch(`${URL}/todos`);
+    return await response.json();
+  }
+
+  async function handleClick(todo: Todo) {
+    const idx = todos!.findIndex((t) => t.id === todo.id);
+    const newState = [...todos!];
+    newState.splice(idx, 1, { ...todo, completed: !todo.completed });
+    setTodos(newState);
+    const response = await fetch(`${URL}/todos/${todo.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        completed: !todo.completed,
+      }),
+    });
+    return await response.json();
+  }
+
+  async function handleCreate() {
+    const response = await fetch(`${URL}/todos`, {
+      method: "POST",
+      body: JSON.stringify({
+        title: "",
+      }),
+    });
+    const json = await response.json();
+
+    const newTodo: Todo = {
+      id: json.id,
+      title: "",
+      completed: false,
+    };
+    const newState = [newTodo, ...todos!];
+    setTodos(newState);
+  }
+
+  const debouncedTitleChange = _.debounce(
+    async (newTitle: string, todo: Todo) => {
+      await fetch(`${URL}/todos/${todo.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          title: newTitle,
+        }),
+      });
+
+      const idx = todos!.findIndex((t) => t.id === todo.id);
+      const newState = [...todos!];
+      newState.splice(idx, 1, { ...todo, title: newTitle });
+      setTodos(newState);
+    },
+    500
+  );
+
+  async function handleTitleChange(
+    e: React.ChangeEvent<HTMLInputElement>,
+    todo: Todo
+  ) {
+    debouncedTitleChange(e.target.value, todo);
+  }
+
+  async function handleDelete(todo: Todo) {
+    const idx = todos!.findIndex((t) => t.id === todo.id);
+    const newState = [...todos!];
+    newState.splice(idx, 1);
+    setTodos(newState);
+    await fetch(`${URL}/todos/${todo.id}`, {
+      method: "DELETE",
+    });
+  }
+
+  async function addTenThousandTodos() {
+    const newTodos: Todo[] = [];
+    for (let i = 0; i < 10000; i++) {
+      newTodos.push({ id: 1000 + i, title: `to do ${i}`, completed: false });
+    }
+    setTodos([...newTodos, ...todos!]);
+  }
+
+  if (!todos) {
+    return <div>Loading...</div>;
+  }
+
   return (
-    <main className={styles.main}>
-      <div className={styles.description}>
-        <p>
-          Get started by editing&nbsp;
-          <code className={styles.code}>app/page.tsx</code>
-        </p>
+    <div>
+      <h1>Next.js TODO</h1>
+      {todos && (
         <div>
-          <a
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{' '}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className={styles.vercelLogo}
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
+          <button onClick={handleCreate}>Create New To Do</button>
+          <button onClick={addTenThousandTodos}>Add 10,000 To Dos</button>
+          <ul>
+            {todos.map((todo) => (
+              <li key={todo.id}>
+                <input
+                  type="checkbox"
+                  checked={todo.completed}
+                  onChange={() => handleClick(todo)}
+                />{" "}
+                <input
+                  type="text"
+                  defaultValue={todo.title}
+                  onChange={(e) => handleTitleChange(e, todo)}
+                />
+                <button onClick={() => handleDelete(todo)}>delete</button>
+              </li>
+            ))}
+          </ul>
         </div>
-      </div>
-
-      <div className={styles.center}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
-
-      <div className={styles.grid}>
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Docs <span>-&gt;</span>
-          </h2>
-          <p>Find in-depth information about Next.js features and API.</p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Learn <span>-&gt;</span>
-          </h2>
-          <p>Learn about Next.js in an interactive course with&nbsp;quizzes!</p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Templates <span>-&gt;</span>
-          </h2>
-          <p>Explore starter templates for Next.js.</p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Deploy <span>-&gt;</span>
-          </h2>
-          <p>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
-  )
+      )}
+    </div>
+  );
 }
